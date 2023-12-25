@@ -1,7 +1,18 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod/riverpod.dart';
 import 'package:riverpod_provider/user.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+// Providers
+// Provider
+// StateProvider
+// StateNotifier and StateNotifierProvider
+// ChangeNotifierProvider
+// FutureProvider
 
 final nameProvider = Provider<String>((ref) {
   return 'Hey flutter!';
@@ -17,9 +28,38 @@ final nameProvider2 = StateProvider<String?>((ref) {
 final userProvider3 =
     StateNotifierProvider<UserNotifier, User>((ref) => UserNotifier());
 
+// ChangeNotifierProvider is exposing ChangeNotifier
+final userChangeNotifierProvider =
+    ChangeNotifierProvider((ref) => UserNotifierChange());
+
 void changeNameProvider(WidgetRef ref, String value) {
   // ref.read(nameProvider2.notifier).update((state) => value);
-  ref.read(userProvider3.notifier).updateName(value);
+  //  ref.read(userProvider3.notifier).updateName(value);
+  // ref.read(userProvider3.notifier).updateName(value);
+  ref.read(userChangeNotifierProvider).updateName(value);
+}
+
+final fetchUserProvider = FutureProvider((ref) async {
+  String url = 'https://jsonplaceholder.typicode.com/users/1';
+
+  // Fetch data from the URL
+  final response = await http.get(Uri.parse(url));
+  log(response.body.toString());
+  return http
+      .get(Uri.parse(url))
+      .then((value) => UserModel.fromJson(value.body));
+  // if (response.statusCode == 200) {
+  //   // If the server returns a 200 OK response, parse the JSON
+  //   final Map<String, dynamic> data = json.decode(response.body);
+  //   return data; // Return the parsed data
+  // } else {
+  //   // If the server did not return a 200 OK response, throw an exception
+  //   throw Exception('Failed to load user');
+  // }
+});
+
+void changeAgeProvider(WidgetRef ref, int value) {
+  ref.read(userChangeNotifierProvider).updateAge(value);
 }
 
 void main() {
@@ -48,21 +88,51 @@ class Home extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(userProvider3);
-    return Scaffold(
-      appBar: AppBar(),
-      body: Column(children: [
-        // TextField(
-        //   onSubmitted: (value) => changeNameProvider(ref, value),
-        // ),
-        Text(user.name),
-        ElevatedButton(
-            onPressed: () {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => StExample()));
-            },
-            child: Text("next page"))
-      ]),
+    // final user = ref.watch(userProvider3);
+    // here widget tree will rebuild only when there is any change in name property
+    // final nameSelect = ref.watch(userProvider3.select((value) => value.name));
+    final userChangeNotifier = ref.watch(userChangeNotifierProvider).user;
+
+    final user = ref.watch(fetchUserProvider);
+
+    // there is no ref here
+    return user.when(
+      data: (data) {
+        return Scaffold(
+          appBar: AppBar(),
+          body: Column(children: [
+            // TextField(
+            //   onSubmitted: (value) => changeNameProvider(ref, value),
+            // ),
+            // Text(user.name),
+            // Text(userChangeNotifier.name),
+            // Text(userChangeNotifier.age.toString()),
+            Text(data.name),
+            Text(data.email),
+            // Text(data.age.toString()),
+            ElevatedButton(
+                onPressed: () {
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (context) => StExample()));
+                },
+                child: Text("next page"))
+          ]),
+        );
+      },
+      error: (error, stackTrace) {
+        return Scaffold(
+          body: Center(
+            child: Text(error.toString()),
+          ),
+        );
+      },
+      loading: () {
+        return Scaffold(
+          body: Center(
+            child: const CircularProgressIndicator(),
+          ),
+        );
+      },
     );
   }
 }
@@ -81,6 +151,7 @@ class NextPage extends StatelessWidget {
             // if the provider data is changed!!!
             final name = ref.watch(nameProvider);
             final name2 = ref.read(nameProvider2) ?? '';
+            final name3 = ref.watch(userChangeNotifierProvider);
             return Center(
               child: Text(name2),
             );
@@ -116,7 +187,11 @@ class _StExampleState extends ConsumerState<StExample> {
         TextField(
           onSubmitted: (value) => changeNameProvider(ref, value),
         ),
-        Text(ref.watch(userProvider3).name)
+        TextField(
+          onSubmitted: (value) => changeAgeProvider(ref, int.parse(value)),
+        ),
+        Text(ref.watch(userChangeNotifierProvider).user.name),
+        Text(ref.watch(userChangeNotifierProvider).user.age.toString())
       ]),
     );
   }
