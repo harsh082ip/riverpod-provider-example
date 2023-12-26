@@ -100,6 +100,13 @@ class Home extends ConsumerWidget {
       data: (data) {
         return Scaffold(
           appBar: AppBar(),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => StExample()));
+            },
+            child: Icon(Icons.navigate_next),
+          ),
           body: Column(children: [
             // TextField(
             //   onSubmitted: (value) => changeNameProvider(ref, value),
